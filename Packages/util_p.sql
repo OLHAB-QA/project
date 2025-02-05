@@ -14,6 +14,19 @@ CREATE OR REPLACE PACKAGE util_p AS
   
   PROCEDURE fire_an_employee(p_employee_id IN NUMBER);
   
+  PROCEDURE change_attribute_employee (
+    p_employee_id      IN NUMBER,
+    p_first_name       IN VARCHAR2 DEFAULT NULL,
+    p_last_name        IN VARCHAR2 DEFAULT NULL,
+    p_email            IN VARCHAR2 DEFAULT NULL,
+    p_phone_number     IN VARCHAR2 DEFAULT NULL,
+    p_job_id           IN VARCHAR2 DEFAULT NULL,
+    p_salary           IN NUMBER DEFAULT NULL,
+    p_commission_pct   IN NUMBER DEFAULT NULL,
+    p_manager_id       IN NUMBER DEFAULT NULL,
+    p_department_id    IN NUMBER DEFAULT NULL
+  );
+  
 END util_p;
 /
 
@@ -21,7 +34,7 @@ END util_p;
 
 
 CREATE OR REPLACE PACKAGE BODY util_p AS
-  PROCEDURE add_employee (
+PROCEDURE add_employee (
     p_first_name      IN VARCHAR2,
     p_last_name       IN VARCHAR2,
     p_email           IN VARCHAR2,
@@ -110,7 +123,7 @@ CREATE OR REPLACE PACKAGE BODY util_p AS
   END add_employee;
 
 
-  FUNCTION is_working_time RETURN BOOLEAN IS
+FUNCTION is_working_time RETURN BOOLEAN IS
         v_day_of_week NUMBER;
         v_hour NUMBER;
     BEGIN
@@ -128,7 +141,7 @@ CREATE OR REPLACE PACKAGE BODY util_p AS
     END is_working_time;
 
     -- Процедура звільнення співробітника
-    PROCEDURE fire_an_employee(p_employee_id IN NUMBER) IS
+PROCEDURE fire_an_employee(p_employee_id IN NUMBER) IS
         v_first_name employees.first_name%TYPE;
         v_last_name employees.last_name%TYPE;
         v_job_id employees.job_id%TYPE;
@@ -177,7 +190,110 @@ CREATE OR REPLACE PACKAGE BODY util_p AS
     
     END fire_an_employee;
     
+PROCEDURE change_attribute_employee (
+    p_employee_id      IN NUMBER,
+    p_first_name       IN VARCHAR2 DEFAULT NULL,
+    p_last_name        IN VARCHAR2 DEFAULT NULL,
+    p_email            IN VARCHAR2 DEFAULT NULL,
+    p_phone_number     IN VARCHAR2 DEFAULT NULL,
+    p_job_id           IN VARCHAR2 DEFAULT NULL,
+    p_salary           IN NUMBER DEFAULT NULL,
+    p_commission_pct   IN NUMBER DEFAULT NULL,
+    p_manager_id       IN NUMBER DEFAULT NULL,
+    p_department_id    IN NUMBER DEFAULT NULL
+  ) IS
+    v_changes_exist BOOLEAN := FALSE;
+  BEGIN
+
+    log_util.log_start(p_proc_name => 'change_attribute_employee', p_text => 'Старт процедури зміни атрибутів співробітника.');
+
     
+    IF p_first_name IS NOT NULL OR
+       p_last_name IS NOT NULL OR
+       p_email IS NOT NULL OR
+       p_phone_number IS NOT NULL OR
+       p_job_id IS NOT NULL OR
+       p_salary IS NOT NULL OR
+       p_commission_pct IS NOT NULL OR
+       p_manager_id IS NOT NULL OR
+       p_department_id IS NOT NULL THEN
+      v_changes_exist := TRUE;
+    END IF;
+
+  
+    IF NOT v_changes_exist THEN
+      log_util.log_finish(p_proc_name => 'change_attribute_employee', p_text => 'Жоден атрибут не було передано для оновлення.');
+      RAISE_APPLICATION_ERROR(-20001, 'Не передано жодного атрибута для оновлення.');
+    END IF;
+
+
+    BEGIN
+      IF p_first_name IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET FIRST_NAME = p_first_name
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_last_name IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET LAST_NAME = p_last_name
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_email IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET EMAIL = p_email
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_phone_number IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET PHONE_NUMBER = p_phone_number
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_job_id IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET JOB_ID = p_job_id
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_salary IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET SALARY = p_salary
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_commission_pct IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET COMMISSION_PCT = p_commission_pct
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_manager_id IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET MANAGER_ID = p_manager_id
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+      IF p_department_id IS NOT NULL THEN
+        UPDATE EMPLOYEES
+        SET DEPARTMENT_ID = p_department_id
+        WHERE EMPLOYEE_ID = p_employee_id;
+      END IF;
+
+   
+      DBMS_OUTPUT.PUT_LINE('У співробітника з ID ' || p_employee_id || ' успішно оновлені атрибути.');
+
+    EXCEPTION
+      WHEN OTHERS THEN
+        log_util.log_error(p_proc_name => 'change_attribute_employee', p_sqlerrm => SQLERRM, p_text => 'Помилка при оновленні атрибутів співробітника.');
+        RAISE_APPLICATION_ERROR(-20001, 'Помилка при оновленні атрибутів: ' || SQLERRM);
+    END;
+
+    
+    log_util.log_finish(p_proc_name => 'change_attribute_employee', p_text => 'Процедура завершена успішно.');
+  END change_attribute_employee;
     
 END util_p;
 /
