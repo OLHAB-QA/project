@@ -1,4 +1,6 @@
 CREATE OR REPLACE PACKAGE log_util AS
+    PROCEDURE to_log(p_appl_proc IN VARCHAR2,p_message IN VARCHAR2);
+    
     PROCEDURE log_start(p_proc_name IN VARCHAR2, p_text IN VARCHAR2 DEFAULT NULL);
 
     PROCEDURE log_finish(p_proc_name IN VARCHAR2, p_text IN VARCHAR2 DEFAULT NULL);
@@ -81,6 +83,5 @@ BEGIN
     log_util.log_start(p_proc_name => 'my_process', p_text => 'Початок виконання.');
     log_util.log_finish(p_proc_name => 'my_process', p_text => 'Успішне завершення.');
 END;
-
 
 
