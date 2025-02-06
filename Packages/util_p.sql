@@ -301,13 +301,11 @@ PROCEDURE change_attribute_employee (
     log_util.log_finish(p_proc_name => 'change_attribute_employee', p_text => 'Процедура завершена успішно.');
   END change_attribute_employee;
     
-    
+        
      
-     
-     
-     
-    
 --SET DEFINE OFF;--
+   
+
    
     FUNCTION get_needed_curr(p_valcode IN VARCHAR2 DEFAULT 'USD',
                              p_date IN DATE DEFAULT SYSDATE) 
@@ -327,7 +325,7 @@ PROCEDURE change_attribute_employee (
             RETURN NULL;  
     END get_needed_curr;
 
-   
+    
     PROCEDURE api_nbu_sync IS
         v_list_currencies VARCHAR2(2000);
         v_currency        VARCHAR2(10);
@@ -367,15 +365,15 @@ PROCEDURE change_attribute_employee (
 
                
                 IF v_json IS NOT NULL THEN
-                    SELECT JSON_VALUE(v_json, '$.r030'),
+                    SELECT TO_NUMBER(JSON_VALUE(v_json, '$.r030')),
                            JSON_VALUE(v_json, '$.txt'),
-                           JSON_VALUE(v_json, '$.rate'),
+                           TO_NUMBER(JSON_VALUE(v_json, '$.rate')),
                            JSON_VALUE(v_json, '$.cc'),
                            TO_DATE(JSON_VALUE(v_json, '$.exchangedate'), 'DD.MM.YYYY')
                     INTO v_r030, v_txt, v_rate, v_currency, v_exchangedate
                     FROM dual;
 
-                   
+                    
                     MERGE INTO cur_exchange ce
                     USING (SELECT v_r030 AS r030, v_txt AS txt, v_rate AS rate, v_currency AS cur, v_exchangedate AS exchangedate FROM DUAL) new_data
                     ON (ce.r030 = new_data.r030 AND ce.exchangedate = new_data.exchangedate)
@@ -398,6 +396,5 @@ PROCEDURE change_attribute_employee (
         log_util.log_finish(p_proc_name => 'api_nbu_sync', p_text => 'Оновлення курсу валют завершено.');
     END api_nbu_sync;
 
-    
 END util_p;
 /
