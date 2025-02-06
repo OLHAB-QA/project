@@ -1,0 +1,1 @@
+SELECT util_p.get_needed_curr('USD', SYSDATE) FROM dual;
