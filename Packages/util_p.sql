@@ -27,6 +27,12 @@ CREATE OR REPLACE PACKAGE util_p AS
     p_department_id    IN NUMBER DEFAULT NULL
   );
   
+  
+    PROCEDURE api_nbu_sync;
+   
+    FUNCTION get_needed_curr(p_valcode IN VARCHAR2 DEFAULT 'USD',
+                             p_date IN DATE DEFAULT SYSDATE) RETURN VARCHAR2;
+
 END util_p;
 /
 
@@ -294,6 +300,104 @@ PROCEDURE change_attribute_employee (
     
     log_util.log_finish(p_proc_name => 'change_attribute_employee', p_text => 'Процедура завершена успішно.');
   END change_attribute_employee;
+    
+    
+     
+     
+     
+     
+    
+--SET DEFINE OFF;--
+   
+    FUNCTION get_needed_curr(p_valcode IN VARCHAR2 DEFAULT 'USD',
+                             p_date IN DATE DEFAULT SYSDATE) 
+    RETURN VARCHAR2 IS
+        v_json VARCHAR2(1000);
+        v_date VARCHAR2(15) := TO_CHAR(p_date, 'YYYYMMDD');
+    BEGIN
+      
+        SELECT sys.get_nbu(p_url => 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=' 
+                        || p_valcode || '&date=' || v_date || '&json') 
+        INTO v_json
+        FROM dual;
+
+        RETURN v_json;
+    EXCEPTION
+        WHEN OTHERS THEN
+            RETURN NULL;  
+    END get_needed_curr;
+
+   
+    PROCEDURE api_nbu_sync IS
+        v_list_currencies VARCHAR2(2000);
+        v_currency        VARCHAR2(10);
+        v_json            VARCHAR2(1000);
+        v_r030            NUMBER;
+        v_txt             VARCHAR2(100);
+        v_rate            NUMBER;
+        v_exchangedate    DATE;
+        v_error_message   VARCHAR2(4000);
+    BEGIN
+        log_util.log_start(p_proc_name => 'api_nbu_sync', p_text => 'Старт оновлення курсу валют.');
+
+       
+        BEGIN
+            SELECT value_text INTO v_list_currencies
+            FROM sys_params
+            WHERE param_name = 'list_currencies';
+
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                v_error_message := 'Параметр list_currencies не знайдено у sys_params.';
+                log_util.log_error('api_nbu_sync', SQLERRM, v_error_message);
+                RAISE_APPLICATION_ERROR(-20001, v_error_message);
+            WHEN OTHERS THEN
+                v_error_message := 'Помилка при отриманні list_currencies: ' || SQLERRM;
+                log_util.log_error('api_nbu_sync', SQLERRM, v_error_message);
+                RAISE_APPLICATION_ERROR(-20002, v_error_message);
+        END;
+
+      
+        FOR cc IN (SELECT REGEXP_SUBSTR(v_list_currencies, '[^,]+', 1, LEVEL) AS curr
+                   FROM DUAL
+                   CONNECT BY REGEXP_SUBSTR(v_list_currencies, '[^,]+', 1, LEVEL) IS NOT NULL) LOOP
+            BEGIN
+               
+                v_json := get_needed_curr(cc.curr, SYSDATE);
+
+               
+                IF v_json IS NOT NULL THEN
+                    SELECT JSON_VALUE(v_json, '$.r030'),
+                           JSON_VALUE(v_json, '$.txt'),
+                           JSON_VALUE(v_json, '$.rate'),
+                           JSON_VALUE(v_json, '$.cc'),
+                           TO_DATE(JSON_VALUE(v_json, '$.exchangedate'), 'DD.MM.YYYY')
+                    INTO v_r030, v_txt, v_rate, v_currency, v_exchangedate
+                    FROM dual;
+
+                   
+                    MERGE INTO cur_exchange ce
+                    USING (SELECT v_r030 AS r030, v_txt AS txt, v_rate AS rate, v_currency AS cur, v_exchangedate AS exchangedate FROM DUAL) new_data
+                    ON (ce.r030 = new_data.r030 AND ce.exchangedate = new_data.exchangedate)
+                    WHEN MATCHED THEN
+                        UPDATE SET ce.rate = new_data.rate
+                    WHEN NOT MATCHED THEN
+                        INSERT (r030, txt, rate, cur, exchangedate)
+                        VALUES (new_data.r030, new_data.txt, new_data.rate, new_data.cur, new_data.exchangedate);
+
+                    COMMIT;
+                END IF;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    v_error_message := 'Помилка при оновленні курсу для ' || cc.curr || ': ' || SQLERRM;
+                    log_util.log_error('api_nbu_sync', SQLERRM, v_error_message);
+                    RAISE_APPLICATION_ERROR(-20003, v_error_message);
+            END;
+        END LOOP;
+
+        log_util.log_finish(p_proc_name => 'api_nbu_sync', p_text => 'Оновлення курсу валют завершено.');
+    END api_nbu_sync;
+
     
 END util_p;
 /
